@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>원소기호 메모리게임</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --accent: #f97316;
+    --accent2: #38bdf8;
+    --gold: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --border: rgba(255,255,255,0.07);
+    --cw: 70px;
+    --ch: calc(var(--cw) * 87 / 56);
+  }
+  /* 모바일: 카드 크기 자동 축소 */
+  @media (max-width: 660px)  { :root { --cw: 56px; } }
+  @media (max-width: 530px)  { :root { --cw: 46px; } }
+  @media (max-width: 440px)  { :root { --cw: 38px; } }
+  @media (max-width: 370px)  { :root { --cw: 32px; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(249,115,22,0.05) 0%, transparent 60%);
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(10,15,30,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+  .game-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(15px, 2.5vw, 22px); font-weight: 900;
+    background: linear-gradient(90deg, #f97316, #fbbf24, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .sub-info {
+    display: flex; gap: 14px; align-items: center;
+    font-size: 12px; color: var(--muted);
+  }
+  .stat-val { color: var(--text); font-weight: 700; }
+  #timer-display {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px; color: var(--accent2); font-weight: 700;
+  }
+  .stage-badges { display: flex; gap: 5px; }
+  .sbadge {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 900; font-family: 'Orbitron', sans-serif;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: var(--muted);
+    transition: all 0.3s;
+  }
+  .sbadge.active { background: linear-gradient(135deg,#ea580c,#f97316); color: white; border-color: transparent; box-shadow: 0 0 10px rgba(249,115,22,0.4); }
+  .sbadge.done   { background: linear-gradient(135deg,#065f46,#10b981); color: white; border-color: transparent; }
+
+  .header-right { display: flex; gap: 10px; align-items: center; }
+  .btn-trophy {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, #b45309, #fbbf24);
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    box-shadow: 0 0 14px rgba(251,191,36,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn-trophy:hover { transform: scale(1.1); box-shadow: 0 0 22px rgba(251,191,36,0.7); }
+
+  main { position: relative; z-index: 1; }
+
+  /* ── START ── */
+  #start-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: calc(100vh - 64px); gap: 26px; padding: 24px;
+    animation: fadeUp 0.6s ease;
+  }
+  .big-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(26px, 5vw, 52px); font-weight: 900;
+    text-align: center; line-height: 1.2;
+    background: linear-gradient(135deg, #f97316, #fbbf24, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 0 30px rgba(249,115,22,0.3));
+  }
+  .desc { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.9; }
+  .desc strong { color: var(--accent2); }
+
+  .stage-preview { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .s-card {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 14px 20px; text-align: center; flex: 1; min-width: 110px;
+  }
+  .s-card .sn { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 900; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 6px; }
+  .s-card .si { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .s-card .si b { color: var(--text); font-weight: 700; }
+
+  .nick-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .nick-wrap label { font-size: 13px; color: var(--muted); }
+  .nick-input {
+    background: rgba(255,255,255,0.05); border: 1.5px solid rgba(249,115,22,0.4); border-radius: 12px;
+    padding: 11px 20px; color: var(--text); font-size: 15px;
+    font-family: 'Noto Sans KR', sans-serif; outline: none; width: 220px; text-align: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .nick-input:focus { border-color: var(--accent); box-shadow: 0 0 14px rgba(249,115,22,0.3); }
+  .nick-input::placeholder { color: var(--muted); }
+
+  .btn-start {
+    background: linear-gradient(135deg, #ea580c, #f97316, #fb923c);
+    border: none; cursor: pointer; padding: 15px 50px; border-radius: 100px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 20px; font-weight: 700; color: white;
+    letter-spacing: 0.06em; box-shadow: 0 0 28px rgba(249,115,22,0.5);
+    transition: transform 0.2s, box-shadow 0.2s; position: relative; overflow: hidden;
+  }
+  .btn-start::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent); }
+  .btn-start:hover { transform: scale(1.05); box-shadow: 0 0 46px rgba(249,115,22,0.7); }
+  .btn-start:active { transform: scale(0.97); }
+
+  /* ── GAME SCREEN ── */
+  #game-screen { display: none; flex-direction: column; align-items: center; padding: 16px; }
+
+  /* 모바일에서 가로 스크롤 없이 그리드가 화면에 맞게 */
+  #play-area-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  /* 핵심: 그리드는 고정, 카드 슬롯도 고정 크기 유지 */
+  #play-area {
+    display: grid;
+    gap: 8px;
+    justify-content: center;
+    padding: 8px;
+  }
+
+  /* 카드 슬롯 — 매칭 후에도 공간 유지 */
+  .card-slot {
+    width: var(--cw);
+    height: var(--ch);
+    perspective: 600px;
+    cursor: pointer;
+    flex-shrink: 0;
+    touch-action: manipulation; /* 모바일 더블탭 줌 방지 */
+    -webkit-tap-highlight-color: transparent; /* 탭 하이라이트 제거 */
+  }
+  .card-slot.matched { cursor: default; pointer-events: none; }
+
+  .card-inner {
+    width: 100%; height: 100%; position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(0.4,0.2,0.2,1);
+    border-radius: 10px;
+  }
+  .card-slot.flipped   .card-inner { transform: rotateY(180deg); }
+  .card-slot.matched   .card-inner { transform: rotateY(180deg); }
+
+  .card-face {
+    position: absolute; inset: 0; border-radius: 10px;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+
+  /* 뒷면 */
+  .card-back {
+    background: linear-gradient(135deg, #1a2744, #0f1e3d);
+    border: 1.5px solid rgba(56,189,248,0.2);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .back-svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.55; }
+
+  /* 앞면 — 기호 */
+  .card-sym {
+    background: linear-gradient(160deg, #0c2d52, #0a1f3a);
+    border: 1.5px solid rgba(56,189,248,0.35);
+    transform: rotateY(180deg);
+    flex-direction: column; gap: 2px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  }
+  .card-slot.matched .card-sym { border-color: var(--gold); box-shadow: 0 0 10px rgba(251,191,36,0.45); }
+  .sym-num { font-size: 9px; color: rgba(56,189,248,0.6); font-weight: 700; font-family: 'Orbitron', sans-serif; }
+  .sym-text {
+    font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 900;
+    color: #e0f2fe; line-height: 1; text-shadow: 0 0 12px rgba(56,189,248,0.7);
+  }
+  @media (max-width: 530px) { .sym-text { font-size: 17px; } }
+  @media (max-width: 440px) { .sym-text { font-size: 14px; } .sym-num { font-size: 7px; } }
+  @media (max-width: 370px) { .sym-text { font-size: 11px; } }
+
+  /* 앞면 — 이름 */
+  .card-name {
+    background: linear-gradient(160deg, #0c3322, #082518);
+    border: 1.5px solid rgba(74,222,128,0.35);
+    transform: rotateY(180deg);
+    flex-direction: column; gap: 2px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  }
+  .card-slot.matched .card-name { border-color: var(--gold); box-shadow: 0 0 10px rgba(251,191,36,0.45); }
+  .name-num { font-size: 8px; color: rgba(74,222,128,0.55); font-weight: 700; font-family: 'Orbitron', sans-serif; }
+  .name-text {
+    font-size: clamp(10px,1.8vw,13px); font-weight: 700;
+    color: #dcfce7; text-align: center; padding: 0 4px; line-height: 1.3;
+    text-shadow: 0 0 8px rgba(74,222,128,0.5);
+  }
+  @media (max-width: 440px) { .name-text { font-size: 9px; } .name-num { font-size: 6px; } }
+  @media (max-width: 370px) { .name-text { font-size: 7px; } }
+
+  /* ── STAGE CLEAR BANNER ── */
+  #stage-banner {
+    position: fixed; inset: 0; z-index: 150;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(10,15,30,0.93); backdrop-filter: blur(10px);
+    gap: 18px; padding: 24px;
+  }
+  #stage-banner.hidden { display: none; }
+  .banner-title {
+    font-family: 'Orbitron', sans-serif; font-size: clamp(28px,6vw,56px); font-weight: 900;
+    background: linear-gradient(135deg,#f97316,#fbbf24);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    text-align: center;
+  }
+  .banner-stat { font-family: 'Orbitron', sans-serif; font-size: 17px; font-weight: 700; color: var(--accent2); }
+  .banner-sub  { font-size: 13px; color: var(--muted); }
+  .banner-preview {
+    width: 100%; max-width: 500px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px; padding: 16px;
+  }
+  .preview-label { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .preview-elems { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .preview-elem {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700;
+  }
+  .preview-elem span { color: var(--accent2); font-family: 'Orbitron', sans-serif; }
+
+  .btn-next-stage {
+    background: linear-gradient(135deg,#ea580c,#f97316); border: none; cursor: pointer;
+    padding: 13px 42px; border-radius: 100px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 17px; font-weight: 700; color: white;
+    box-shadow: 0 0 24px rgba(249,115,22,0.5); transition: transform 0.2s, box-shadow 0.2s;
+    margin-top: 6px;
+  }
+  .btn-next-stage:hover { transform: scale(1.06); box-shadow: 0 0 38px rgba(249,115,22,0.7); }
+
+  /* ── OVERLAYS ── */
+  .overlay {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(10,15,30,0.88); backdrop-filter: blur(8px);
+  }
+  .overlay.hidden { display: none; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; padding: 32px 36px;
+    max-width: 500px; width: 90%; max-height: 82vh; overflow-y: auto;
+    box-shadow: 0 28px 72px rgba(0,0,0,0.6);
+  }
+  .modal h2 {
+    font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 900;
+    margin-bottom: 20px; text-align: center;
+    background: linear-gradient(90deg,#fbbf24,#f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .lb-tabs { display: flex; gap: 8px; margin-bottom: 16px; justify-content: center; }
+  .lb-tab {
+    padding: 7px 18px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: var(--muted);
+    font-family: 'Noto Sans KR', sans-serif; transition: all 0.2s;
+  }
+  .lb-tab.active { background: linear-gradient(135deg,#ea580c,#f97316); color: white; border-color: transparent; }
+  .lb-list { list-style: none; }
+  .lb-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 13px; border-radius: 11px; margin-bottom: 7px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+  }
+  .lb-rank {
+    width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900;
+    background: rgba(255,255,255,0.06); color: var(--muted);
+  }
+  .lb-rank.r1 { background: linear-gradient(135deg,#b45309,#fbbf24); color: white; }
+  .lb-rank.r2 { background: linear-gradient(135deg,#475569,#94a3b8); color: white; }
+  .lb-rank.r3 { background: linear-gradient(135deg,#7c2d12,#c2410c); color: white; }
+  .lb-name  { flex: 1; font-weight: 700; font-size: 14px; }
+  .lb-time  { font-size: 12px; color: var(--accent2); font-weight: 700; font-family: 'Orbitron', sans-serif; }
+  .lb-plays { font-size: 11px; color: var(--muted); }
+  .lb-empty { text-align: center; color: var(--muted); padding: 22px 0; font-size: 13px; }
+
+  .btn-close {
+    display: block; margin: 20px auto 0;
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 11px;
+    color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 9px 28px; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-close:hover { background: rgba(255,255,255,0.12); }
+
+  /* ── WIN MODAL ── */
+  .win-modal { text-align: center; }
+  .win-modal h2 { font-size: 26px; margin-bottom: 6px; }
+  .win-sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .win-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+  .win-stat { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 13px; padding: 14px; }
+  .win-stat-label { font-size: 10px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .win-stat-val { font-size: 22px; font-weight: 900; font-family: 'Orbitron', sans-serif; color: var(--accent2); }
+  .stage-breakdown { font-size: 12px; color: var(--muted); line-height: 2.1; margin: 10px 0; }
+  .stage-breakdown span { color: var(--accent2); font-family: 'Orbitron', sans-serif; font-weight: 700; }
+  .win-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  .btn-orange {
+    background: linear-gradient(135deg,#ea580c,#f97316); border: none; cursor: pointer;
+    padding: 11px 28px; border-radius: 100px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700; color: white;
+    box-shadow: 0 0 18px rgba(249,115,22,0.4); transition: transform 0.2s;
+  }
+  .btn-orange:hover { transform: scale(1.05); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 100px;
+    color: var(--text); font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700;
+    padding: 11px 28px; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.13); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes cardIn   { from{opacity:0;transform:scale(0.7) rotateY(90deg)} to{opacity:1;transform:scale(1) rotateY(0)} }
+  @keyframes shake    { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  @keyframes matchGlow { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 20px rgba(251,191,36,0.6)} }
+
+  .card-appear { animation: cardIn 0.4s ease both; }
+  .do-shake    { animation: shake 0.4s ease; }
+
+  /* 모바일에서 시작화면 여백 축소 */
+  @media (max-width: 480px) {
+    #start-screen { gap: 18px; padding: 16px; }
+    .stage-preview .s-card { padding: 10px 12px; min-width: 90px; }
+    .big-title { font-size: clamp(22px, 8vw, 36px); }
+    .btn-start { padding: 13px 36px; font-size: 18px; }
+    .nick-input { width: 190px; }
+    .modal { padding: 24px 20px; }
+  }
+  /* 모바일에서 헤더 sub-info 줄바꿈 방지 */
+  .sub-info { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header id="main-header">
+  <div class="header-left">
+    <div class="game-title">⚗️ ELEMENT MEMORY</div>
+    <div class="sub-info" id="header-info" style="display:none">
+      <div class="stage-badges">
+        <div class="sbadge" id="badge-1">1</div>
+        <div class="sbadge" id="badge-2">2</div>
+        <div class="sbadge" id="badge-3">3</div>
+      </div>
+      <span>매칭: <span class="stat-val" id="h-matched">0</span>/<span id="h-total">10</span></span>
+      <span id="timer-display">00:00</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn-trophy" id="btn-trophy" title="랭킹">🏆</button>
+  </div>
+</header>
+
+<main>
+  <!-- START -->
+  <div id="start-screen">
+    <div class="big-title">원소기호<br>메모리게임</div>
+    <p class="desc"><strong>3단계</strong>로 구성된 원소 카드 매칭 게임!<br>단계별로 원소를 익히며 최고 기록에 도전하세요.</p>
+    <div class="stage-preview">
+      <div class="s-card"><div class="sn">STAGE 1</div><div class="si"><b>H ~ Ne</b><br>원소번호 1~10<br>카드 20장</div></div>
+      <div class="s-card"><div class="sn">STAGE 2</div><div class="si"><b>Na ~ Ca</b><br>원소번호 11~20<br>카드 20장</div></div>
+      <div class="s-card"><div class="sn">STAGE 3</div><div class="si"><b>H ~ Ca</b><br>원소번호 1~20<br>카드 40장</div></div>
+    </div>
+    <div class="nick-wrap">
+      <label for="nick-input">닉네임 입력</label>
+      <input class="nick-input" id="nick-input" type="text" placeholder="닉네임을 입력하세요" maxlength="12">
+    </div>
+    <button class="btn-start" id="btn-start">시 작</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game-screen">
+    <div id="play-area-wrap">
+      <div id="play-area"></div>
+    </div>
+  </div>
+</main>
+
+<!-- STAGE CLEAR BANNER -->
+<div id="stage-banner" class="hidden">
+  <div class="banner-title" id="b-title"></div>
+  <div class="banner-stat"  id="b-stat"></div>
+  <div class="banner-sub"   id="b-sub"></div>
+  <div class="banner-preview" id="b-preview" style="display:none">
+    <div class="preview-label">▼ 다음 단계 원소 미리보기</div>
+    <div class="preview-elems" id="b-elems"></div>
+  </div>
+  <button class="btn-next-stage" id="btn-next-stage"></button>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="overlay hidden" id="lb-overlay">
+  <div class="modal">
+    <h2>🏆 명예의 전당</h2>
+    <div class="lb-tabs">
+      <button class="lb-tab active" data-s="1">1단계</button>
+      <button class="lb-tab"        data-s="2">2단계</button>
+      <button class="lb-tab"        data-s="3">3단계</button>
+    </div>
+    <ul class="lb-list" id="lb-list"></ul>
+    <button class="btn-close" id="close-lb">닫기</button>
+  </div>
+</div>
+
+<!-- FINAL WIN -->
+<div class="overlay hidden" id="win-overlay">
+  <div class="modal win-modal">
+    <h2>🎉 전체 완성!</h2>
+    <p class="win-sub">3단계를 모두 클리어했습니다!</p>
+    <div class="win-stats">
+      <div class="win-stat"><div class="win-stat-label">총 시간</div><div class="win-stat-val" id="w-time">--</div></div>
+      <div class="win-stat"><div class="win-stat-label">총 플레이</div><div class="win-stat-val" id="w-plays">--</div></div>
+    </div>
+    <div class="stage-breakdown">
+      1단계: <span id="w-s1"></span><br>
+      2단계: <span id="w-s2"></span><br>
+      3단계: <span id="w-s3"></span>
+    </div>
+    <div class="win-buttons">
+      <button class="btn-orange" id="btn-again">처음부터 다시</button>
+      <button class="btn-ghost"  id="btn-win-rank">랭킹 보기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── 데이터 ── */
+const ALL = [
+  {n:1, s:'H',  nm:'수소'},    {n:2,  s:'He', nm:'헬륨'},
+  {n:3, s:'Li', nm:'리튬'},    {n:4,  s:'Be', nm:'베릴륨'},
+  {n:5, s:'B',  nm:'붕소'},    {n:6,  s:'C',  nm:'탄소'},
+  {n:7, s:'N',  nm:'질소'},    {n:8,  s:'O',  nm:'산소'},
+  {n:9, s:'F',  nm:'플루오린'},{n:10, s:'Ne', nm:'네온'},
+  {n:11,s:'Na', nm:'나트륨'},  {n:12, s:'Mg', nm:'마그네슘'},
+  {n:13,s:'Al', nm:'알루미늄'},{n:14, s:'Si', nm:'규소'},
+  {n:15,s:'P',  nm:'인'},      {n:16, s:'S',  nm:'황'},
+  {n:17,s:'Cl', nm:'염소'},    {n:18, s:'Ar', nm:'아르곤'},
+  {n:19,s:'K',  nm:'칼륨'},    {n:20, s:'Ca', nm:'칼슘'},
+];
+const STAGE_ELEMS = { 1: ALL.slice(0,10), 2: ALL.slice(10,20), 3: ALL };
+
+/* ── 상태 ── */
+let stage = 1;
+let cards = [];          // 배열 순서(위치) 절대 변경 안 함
+let openIds = [];        // 현재 뒤집힌 카드 (최대 2)
+let matchedSet = new Set();
+let plays = 0;
+let locked = false;
+let timerInterval = null;
+let startTime = null;
+let elapsed = 0;
+let nickname = '';
+let stageStats = {};
+let lbTab = 1;
+
+/* ── 유틸 ── */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+function fmt(s) {
+  if (s == null) return '--:--';
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  return m + ':' + Math.floor(s%60).toString().padStart(2,'0');
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ── 타이머 ── */
+function startTimer() {
+  if (startTime !== null) return;
+  startTime = Date.now() - elapsed * 1000;
+  timerInterval = setInterval(() => {
+    elapsed = (Date.now() - startTime) / 1000;
+    document.getElementById('timer-display').textContent = fmt(elapsed);
+  }, 200);
+}
+function stopTimer() {
+  clearInterval(timerInterval);
+  if (startTime !== null)
+    elapsed = (Date.now() - startTime) / 1000;
+}
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerInterval = null; startTime = null; elapsed = 0;
+  document.getElementById('timer-display').textContent = '00:00';
+}
+
+/* ── 헤더 업데이트 ── */
+function updateHeader() {
+  document.getElementById('h-matched').textContent = matchedSet.size / 2;
+  document.getElementById('timer-display').textContent = fmt(elapsed);
+}
+function updateBadges() {
+  for (let s = 1; s <= 3; s++) {
+    const b = document.getElementById('badge-' + s);
+    b.className = 'sbadge';
+    if (stageStats[s])  b.classList.add('done');
+    else if (s === stage) b.classList.add('active');
+  }
+}
+
+/* ── SVG 뒷면 패턴 ── */
+function backSVG() {
+  return `<svg class="back-svg" viewBox="0 0 70 109" xmlns="http://www.w3.org/2000/svg">
+    <defs><pattern id="hx" x="0" y="0" width="14" height="16.16" patternUnits="userSpaceOnUse">
+      <polygon points="7,1 13,4.5 13,11.5 7,15 1,11.5 1,4.5"
+        fill="none" stroke="rgba(56,189,248,0.35)" stroke-width="0.8"/>
+    </pattern></defs>
+    <rect width="70" height="109" fill="url(#hx)"/>
+    <text x="35" y="58" text-anchor="middle" dominant-baseline="middle"
+      font-family="serif" font-size="28" fill="rgba(56,189,248,0.18)" font-weight="bold">⚗</text>
+  </svg>`;
+}
+
+/* ── 카드 DOM 생성 ── */
+function makeCard(card) {
+  const slot = document.createElement('div');
+  slot.className = 'card-slot card-appear';
+  slot.dataset.id = card.id;
+
+  const inner = document.createElement('div');
+  inner.className = 'card-inner';
+
+  // 뒷면
+  const back = document.createElement('div');
+  back.className = 'card-face card-back';
+  back.innerHTML = backSVG();
+
+  // 앞면
+  const front = document.createElement('div');
+  if (card.type === 'sym') {
+    front.className = 'card-face card-sym';
+    front.innerHTML = `<span class="sym-num">${card.n}</span><span class="sym-text">${card.s}</span>`;
+  } else {
+    front.className = 'card-face card-name';
+    front.innerHTML = `<span class="name-num">${card.n}</span><span class="name-text">${card.nm}</span>`;
+  }
+
+  inner.appendChild(back);
+  inner.appendChild(front);
+  slot.appendChild(inner);
+
+  slot.addEventListener('click', () => onCardClick(card.id));
+  return slot;
+}
+
+/* ── 스테이지 초기화 ── */
+function initStage(s) {
+  stage = s;
+  const elems = STAGE_ELEMS[s];
+
+  const raw = [];
+  elems.forEach(e => {
+    raw.push({ id:`sym-${e.n}`,  pairId:`name-${e.n}`, type:'sym',  n:e.n, s:e.s, nm:e.nm });
+    raw.push({ id:`name-${e.n}`, pairId:`sym-${e.n}`,  type:'name', n:e.n, s:e.s, nm:e.nm });
+  });
+
+  cards = shuffle(raw);   // 섞인 순서 그대로 고정
+  openIds   = [];
+  matchedSet = new Set();
+  plays  = 0;
+  locked = false;
+  resetTimer();
+
+  /* 그리드 */
+  const cols = s === 3 ? 8 : 5;
+  const pa = document.getElementById('play-area');
+  pa.innerHTML = '';
+  pa.style.gridTemplateColumns = `repeat(${cols}, var(--cw))`;
+
+  /* 카드 삽입 — 순서 고정, 애니메이션 딜레이만 */
+  cards.forEach((c, i) => {
+    const el = makeCard(c);
+    el.style.animationDelay = (i * 0.03) + 's';
+    pa.appendChild(el);
+  });
+
+  document.getElementById('h-total').textContent = elems.length;
+  document.getElementById('header-info').style.display = 'flex';
+  document.getElementById('start-screen').style.display  = 'none';
+  document.getElementById('game-screen').style.display   = 'flex';
+  document.getElementById('stage-banner').classList.add('hidden');
+
+  updateBadges();
+  updateHeader();
+}
+
+/* ── 카드 클릭 ── */
+function onCardClick(id) {
+  if (locked) return;
+  if (matchedSet.has(id)) return;
+  if (openIds.includes(id)) return;
+  if (openIds.length >= 2) return;
+
+  startTimer();
+
+  /* 뒤집기 */
+  const slot = document.querySelector(`.card-slot[data-id="${id}"]`);
+  slot.classList.add('flipped');
+  openIds.push(id);
+
+  if (openIds.length < 2) return;
+
+  /* 두 장 선택됨 */
+  plays++;
+  updateHeader();
+  locked = true;
+
+  const [id1, id2] = openIds;
+  const c1 = cards.find(c => c.id === id1);
+  const c2 = cards.find(c => c.id === id2);
+  const isMatch = c1 && c2 && c1.pairId === id2 && c2.pairId === id1;
+
+  if (isMatch) {
+    /* ── 매칭 성공: 카드 제자리 유지, matched 클래스만 추가 ── */
+    setTimeout(() => {
+      [id1, id2].forEach(id => {
+        const s = document.querySelector(`.card-slot[data-id="${id}"]`);
+        // flipped 제거 후 matched 추가 (matched CSS가 rotateY(180deg) 유지)
+        s.classList.remove('flipped');
+        s.classList.add('matched');
+      });
+      matchedSet.add(id1);
+      matchedSet.add(id2);
+      openIds = [];
+      locked  = false;
+      updateHeader();
+
+      /* 스테이지 클리어 체크 */
+      const total = STAGE_ELEMS[stage].length * 2;
+      if (matchedSet.size === total) {
+        stopTimer();
+        stageStats[stage] = { time: elapsed, plays };
+        saveScore(nickname, stage, elapsed, plays);
+        setTimeout(() => showStageClear(stage), 500);
+      }
+    }, 600);
+
+  } else {
+    /* ── 매칭 실패: 흔들고 다시 뒤집기 ── */
+    const s1 = document.querySelector(`.card-slot[data-id="${id1}"]`);
+    const s2 = document.querySelector(`.card-slot[data-id="${id2}"]`);
+    s1.classList.add('do-shake');
+    s2.classList.add('do-shake');
+
+    setTimeout(() => {
+      s1.classList.remove('flipped', 'do-shake');
+      s2.classList.remove('flipped', 'do-shake');
+      openIds = [];
+      locked  = false;
+    }, 900);
+  }
+}
+
+/* ── 스테이지 클리어 ── */
+function showStageClear(s) {
+  const stat = stageStats[s];
+  document.getElementById('b-title').textContent = `STAGE ${s} CLEAR!`;
+  document.getElementById('b-stat').textContent  = `${fmt(stat.time)}  ·  ${stat.plays}회 플레이`;
+
+  if (s < 3) {
+    document.getElementById('b-sub').textContent = '다음 단계로 넘어갑니다!';
+    const nextElems = STAGE_ELEMS[s+1];
+    document.getElementById('b-elems').innerHTML =
+      nextElems.map(e => `<div class="preview-elem"><span>${e.s}</span> ${e.nm}</div>`).join('');
+    document.getElementById('b-preview').style.display = 'block';
+
+    const btn = document.getElementById('btn-next-stage');
+    btn.textContent = `${s+1}단계 시작 →`;
+    btn.onclick = () => initStage(s+1);
+  } else {
+    document.getElementById('b-sub').textContent = '';
+    document.getElementById('b-preview').style.display = 'none';
+    // stage 3 → 바로 최종 화면
+    document.getElementById('stage-banner').classList.add('hidden');
+    showFinalWin();
+    return;
+  }
+
+  document.getElementById('stage-banner').classList.remove('hidden');
+}
+
+/* ── 최종 완성 ── */
+function showFinalWin() {
+  const tt = [1,2,3].reduce((a,s) => a + (stageStats[s]?.time||0), 0);
+  const tp = [1,2,3].reduce((a,s) => a + (stageStats[s]?.plays||0), 0);
+  document.getElementById('w-time').textContent  = fmt(tt);
+  document.getElementById('w-plays').textContent = tp + '회';
+  [1,2,3].forEach(s => {
+    document.getElementById('w-s'+s).textContent =
+      stageStats[s] ? `${fmt(stageStats[s].time)} / ${stageStats[s].plays}회` : '-';
+  });
+  document.getElementById('win-overlay').classList.remove('hidden');
+}
+
+/* ── 랭킹 (localStorage) ── */
+function saveScore(nick, s, time, p) {
+  const key = `elem_lb_s${s}`;
+  let lb = getLB(s);
+  lb.push({ nick: nick||'익명', time, plays:p, date: new Date().toLocaleDateString('ko-KR') });
+  lb.sort((a,b) => a.time - b.time);
+  localStorage.setItem(key, JSON.stringify(lb.slice(0,50)));
+}
+function getLB(s) {
+  try { return JSON.parse(localStorage.getItem(`elem_lb_s${s}`)) || []; } catch { return []; }
+}
+function renderLB(s) {
+  lbTab = s;
+  document.querySelectorAll('.lb-tab').forEach(t =>
+    t.classList.toggle('active', parseInt(t.dataset.s) === s));
+  const lb = getLB(s);
+  const list = document.getElementById('lb-list');
+  if (!lb.length) {
+    list.innerHTML = '<li class="lb-empty">아직 기록이 없어요!</li>';
+    return;
+  }
+  list.innerHTML = lb.slice(0,20).map((r,i) => `
+    <li class="lb-item">
+      <div class="lb-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</div>
+      <div class="lb-name">${esc(r.nick)}</div>
+      <div class="lb-time">${fmt(r.time)}</div>
+      <div class="lb-plays">${r.plays}회 · ${r.date}</div>
+    </li>`).join('');
+}
+
+/* ── 이벤트 ── */
+document.getElementById('btn-start').addEventListener('click', () => {
+  nickname = document.getElementById('nick-input').value.trim() || '익명';
+  stageStats = {};
+  initStage(1);
+});
+document.getElementById('nick-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-start').click();
+});
+
+document.getElementById('btn-trophy').addEventListener('click', () => {
+  renderLB(stage);
+  document.getElementById('lb-overlay').classList.remove('hidden');
+});
+document.getElementById('close-lb').addEventListener('click', () =>
+  document.getElementById('lb-overlay').classList.add('hidden'));
+document.getElementById('lb-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('lb-overlay'))
+    document.getElementById('lb-overlay').classList.add('hidden');
+});
+document.querySelectorAll('.lb-tab').forEach(t =>
+  t.addEventListener('click', () => renderLB(parseInt(t.dataset.s))));
+
+document.getElementById('btn-again').addEventListener('click', () => {
+  document.getElementById('win-overlay').classList.add('hidden');
+  stageStats = {};
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('start-screen').style.display = 'flex';
+  document.getElementById('header-info').style.display  = 'none';
+});
+document.getElementById('btn-win-rank').addEventListener('click', () => {
+  document.getElementById('win-overlay').classList.add('hidden');
+  renderLB(3);
+  document.getElementById('lb-overlay').classList.remove('hidden');
+});
+document.getElementById('win-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('win-overlay'))
+    document.getElementById('win-overlay').classList.add('hidden');
+});
+</script>
+</body>
+</html>
